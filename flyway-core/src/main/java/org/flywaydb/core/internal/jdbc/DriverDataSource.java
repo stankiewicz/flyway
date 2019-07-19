@@ -56,6 +56,8 @@ public class DriverDataSource implements DataSource {
     private static final String SYBASE_JDBC_URL_PREFIX = "jdbc:sybase:";
     private static final String TEST_CONTAINERS_JDBC_DRIVER = "org.testcontainers.jdbc.ContainerDatabaseDriver";
     private static final String TEST_CONTAINERS_JDBC_URL_PREFIX = "jdbc:tc:";
+    private static final String CLOUDSPANNER_JDBC_URL_PREFIX = "jdbc:cloudspanner:";
+    private static final String CLOUDSPANNER_JDBC_DRIVER = "com.simba.cloudspanner.core.jdbc42.CloudSpanner42Driver";
 
     /**
      * The name of the application that created the connection. This is useful for databases that allow setting this
@@ -327,6 +329,10 @@ public class DriverDataSource implements DataSource {
 
         if (url.startsWith("jdbc:google:")) {
             return MYSQL_GOOGLE_JDBC_DRIVER;
+        }
+
+        if(url.startsWith(CLOUDSPANNER_JDBC_URL_PREFIX)){
+            return CLOUDSPANNER_JDBC_DRIVER;
         }
 
         if (url.startsWith(ORACLE_JDBC_URL_PREFIX)) {

@@ -29,6 +29,7 @@ import java.sql.Types;
  */
 @SuppressWarnings("SqlDialectInspection")
 public enum DatabaseType {
+    CLOUDSPANNER("Cloud Spanner", Types.NULL, true),
     COCKROACHDB("CockroachDB", Types.NULL, false),
     DB2("DB2", Types.VARCHAR, true),
 
@@ -133,6 +134,9 @@ public enum DatabaseType {
         }
         if (databaseProductName.startsWith("Informix")) {
             return INFORMIX;
+        }
+        if (databaseProductName.startsWith("Cloud Spanner")){
+            return CLOUDSPANNER;
         }
         throw new FlywayException("Unsupported Database: " + databaseProductName);
     }
