@@ -24,8 +24,14 @@ public class CloudSpannerConnection extends Connection<CloudSpannerDatabase> {
         return new CloudSpannerSchema(jdbcTemplate, database, name);
     }
 
-//    @Override
-//    public <T> T lock(Table table, Callable<T> callable) {
-//        return new ClousSpannerLockTemplate(jdbcTemplate, table.toString().hashCode()).execute(callable);
-//    }
+   @Override
+   public <T> T lock(Table table, Callable<T> callable)  {
+       //return new ClousSpannerLockTemplate(jdbcTemplate, table.toString().hashCode()).execute(callable);
+       try {
+           return callable.call();
+       } catch (Exception e) {
+           e.printStackTrace();
+       }
+       return null;
+   }
 }

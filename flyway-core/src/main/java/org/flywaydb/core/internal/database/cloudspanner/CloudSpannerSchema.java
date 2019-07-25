@@ -1,5 +1,9 @@
 package org.flywaydb.core.internal.database.cloudspanner;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
 import org.flywaydb.core.internal.database.base.Schema;
 import org.flywaydb.core.internal.database.base.Table;
 import org.flywaydb.core.internal.jdbc.JdbcTemplate;
@@ -27,13 +31,15 @@ public class CloudSpannerSchema extends Schema<CloudSpannerDatabase, CloudSpanne
 
     @Override
     protected boolean doEmpty() throws SQLException {
-        // is tables enough? what about indexes?
-        return !jdbcTemplate.queryForBoolean("SELECT EXISTS (" +
-                "  SELECT 1" +
-                "  FROM information_schema.tables" +
-                "  WHERE" +
-                "  table_schema=''" +
-                ")");
+
+        try (Connection c = database.getNewRawConnection()){
+            Statement s = c.createStatement();
+            s.execute("SET TRANSACTION READ ONLY");
+            s.close();
+            try(ResultSet tables = c.getMetaData().getTables("", "", null, null)){
+                return !tables.next();
+            }
+        }
     }
 
     @Override
@@ -54,14 +60,21 @@ public class CloudSpannerSchema extends Schema<CloudSpannerDatabase, CloudSpanne
 
     @Override
     protected CloudSpannerTable[] doAllTables() throws SQLException {
-        String query =
-                "SELECT table_name FROM information_schema.tables WHERE table_schema=''";
-        List<String> tableNames = jdbcTemplate.queryForStringList(query, name);
-        CloudSpannerTable[] tables = new CloudSpannerTable[tableNames.size()];
-        for (int i = 0; i < tableNames.size(); i++) {
-            tables[i] = new CloudSpannerTable(jdbcTemplate, database, this, tableNames.get(i));
+        List<CloudSpannerTable> tablesList = new ArrayList<>();
+        try (Connection c = database.getNewRawConnection()) {
+            Statement s = c.createStatement();
+            s.execute("SET TRANSACTION READ ONLY");
+            s.close();
+            ResultSet tablesRs = c.getMetaData().getTables("", "", null, null);
+            while (tablesRs.next()) {
+                tablesList.add(new CloudSpannerTable(jdbcTemplate, database, this,
+                    tablesRs.getString("TABLE_NAME")));
+            }
+            tablesRs.close();
         }
-        return tables;
+
+        CloudSpannerTable[] tables = new CloudSpannerTable[tablesList.size()];
+        return tablesList.toArray(tables);
     }
 
     @Override

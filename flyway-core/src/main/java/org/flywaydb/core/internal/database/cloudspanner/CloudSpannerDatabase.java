@@ -1,5 +1,6 @@
 package org.flywaydb.core.internal.database.cloudspanner;
 
+import java.sql.DatabaseMetaData;
 import org.flywaydb.core.api.configuration.Configuration;
 import org.flywaydb.core.internal.database.base.Database;
 import org.flywaydb.core.internal.database.base.Table;
@@ -24,7 +25,11 @@ public class CloudSpannerDatabase extends Database<CloudSpannerConnection> {
 
     @Override
     public boolean supportsDdlTransactions() {
-        return true;
+        return false;
+    }
+
+    Connection getNewRawConnection() {
+        return jdbcConnectionFactory.openConnection();
     }
 
     @Override
@@ -54,7 +59,7 @@ public class CloudSpannerDatabase extends Database<CloudSpannerConnection> {
 
     @Override
     public String getRawCreateScript(Table table, boolean baseline) {
-        return "SET TRANSACTION READ WRITE;" +
+        return "" +
                 "CREATE TABLE " + table.getName() + " (\n" +
                 "    installed_rank INT64 NOT NULL,\n" +
                 "    version STRING(50),\n" +
@@ -63,7 +68,7 @@ public class CloudSpannerDatabase extends Database<CloudSpannerConnection> {
                 "    script STRING(1000) NOT NULL,\n" +
                 "    checksum INT64,\n" +
                 "    installed_by STRING(100) NOT NULL,\n" +
-                "    installed_on TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),\n" +
+                "    installed_on TIMESTAMP OPTIONS (allow_commit_timestamp=true),\n" +
                 "    execution_time INT64 NOT NULL,\n" +
                 "    success BOOL NOT NULL\n" +
                 ") PRIMARY KEY (installed_rank DESC);\n" +

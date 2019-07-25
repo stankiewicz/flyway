@@ -15,49 +15,34 @@
  */
 package org.flywaydb.core.internal.jdbc;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.concurrent.Callable;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.logging.Log;
 import org.flywaydb.core.api.logging.LogFactory;
 import org.flywaydb.core.internal.exception.FlywaySqlException;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.concurrent.Callable;
-
 /**
  * Spring-like template for executing transactions.
  */
-public class TransactionTemplate implements Template {
-    private static final Log LOG = LogFactory.getLog(TransactionTemplate.class);
+public class NonTransactionTemplate implements  Template{
+    private static final Log LOG = LogFactory.getLog(NonTransactionTemplate.class);
 
     /**
      * The connection for the transaction.
      */
     private final Connection connection;
 
-    /**
-     * Whether to roll back the transaction when an exception is thrown.
-     */
-    private final boolean rollbackOnException;
 
-    /**
-     * Creates a new transaction template for this connection.
-     *
-     * @param connection The connection for the transaction.
-     */
-    public TransactionTemplate(Connection connection) {
-        this(connection, true);
-    }
 
     /**
      * Creates a new transaction template for this connection.
      *
      * @param connection          The connection for the transaction.
-     * @param rollbackOnException Whether to roll back the transaction when an exception is thrown.
      */
-    public TransactionTemplate(Connection connection, boolean rollbackOnException) {
+    public NonTransactionTemplate(Connection connection) {
         this.connection = connection;
-        this.rollbackOnException = rollbackOnException;
     }
 
     /**
@@ -70,7 +55,7 @@ public class TransactionTemplate implements Template {
         boolean oldAutocommit = true;
         try {
             oldAutocommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
+            connection.setAutoCommit(true);
             T result = callback.call();
             connection.commit();
             return result;
@@ -84,21 +69,6 @@ public class TransactionTemplate implements Template {
                 rethrow = new FlywayException(e);
             }
 
-            if (rollbackOnException) {
-                try {
-                    LOG.debug("Rolling back transaction...");
-                    connection.rollback();
-                    LOG.debug("Transaction rolled back");
-                } catch (SQLException se) {
-                    LOG.error("Unable to rollback transaction", se);
-                }
-            } else {
-                try {
-                    connection.commit();
-                } catch (SQLException se) {
-                    LOG.error("Unable to commit transaction", se);
-                }
-            }
             throw rethrow;
         } finally {
             try {

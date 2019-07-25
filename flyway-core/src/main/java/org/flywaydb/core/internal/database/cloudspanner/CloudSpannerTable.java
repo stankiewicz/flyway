@@ -26,12 +26,13 @@ public class CloudSpannerTable extends Table<CloudSpannerDatabase, CloudSpannerS
 
     @Override
     protected boolean doExists() throws SQLException {
-        final Connection connection = jdbcTemplate.getConnection();
-        if(!connection.getAutoCommit())
-            connection.commit();
-        connection.createStatement().execute("SET TRANSACTION READ ONLY");
-        try(ResultSet tables = connection.getMetaData().getTables("", "", this.name, null)){
-            return tables.next();
+        try (Connection c = database.getNewRawConnection()){
+            Statement s = c.createStatement();
+            s.execute("SET TRANSACTION READ ONLY");
+            s.close();
+            try(ResultSet tables = c.getMetaData().getTables("", "", this.name, null)){
+                return tables.next();
+            }
         }
     }
 
@@ -42,10 +43,10 @@ public class CloudSpannerTable extends Table<CloudSpannerDatabase, CloudSpannerS
 
     @Override
     protected void doDrop() throws SQLException {
-        final Statement statement = jdbcTemplate.getConnection().createStatement();
-        // maybe drop interleaved tables and indexes first?
-        statement.addBatch("DROP TABLE " + database.quote(name));
-        statement.executeBatch();
+        // final Statement statement = jdbcTemplate.getConnection().createStatement();
+        // // maybe drop interleaved tables and indexes first?
+        // statement.addBatch("DROP TABLE " + database.quote(name));
+        // statement.executeBatch();
     }
 
     @Override
