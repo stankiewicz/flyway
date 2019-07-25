@@ -1,5 +1,6 @@
 package org.flywaydb.core.internal.database.cloudspanner;
 
+import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.internal.database.base.Connection;
 import org.flywaydb.core.internal.database.base.Schema;
 import org.flywaydb.core.internal.database.base.Table;
@@ -30,8 +31,13 @@ public class CloudSpannerConnection extends Connection<CloudSpannerDatabase> {
        try {
            return callable.call();
        } catch (Exception e) {
-           e.printStackTrace();
+           RuntimeException rethrow;
+           if (e instanceof RuntimeException) {
+               rethrow = (RuntimeException) e;
+           } else {
+               rethrow = new FlywayException(e);
+           }
+           throw rethrow;
        }
-       return null;
    }
 }
