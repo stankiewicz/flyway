@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,15 +71,15 @@ public class FileSystemScanner {
 
         File dir = new File(path);
         if (!dir.exists()) {
-            LOG.warn("Skipping filesystem location:" + path + " (not found)");
+            LOG.warn("Skipping filesystem location:" + path + " (not found). Note this warning will become an error in Flyway 7.");
             return Collections.emptyList();
         }
         if (!dir.canRead()) {
-            LOG.warn("Skipping filesystem location:" + path + " (not readable)");
+            LOG.warn("Skipping filesystem location:" + path + " (not readable). Note this warning will become an error in Flyway 7.");
             return Collections.emptyList();
         }
         if (!dir.isDirectory()) {
-            LOG.warn("Skipping filesystem location:" + path + " (not a directory)");
+            LOG.warn("Skipping filesystem location:" + path + " (not a directory). Note this warning will become an error in Flyway 7.");
             return Collections.emptyList();
         }
 

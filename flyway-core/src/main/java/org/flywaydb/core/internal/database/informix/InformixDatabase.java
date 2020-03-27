@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,11 @@ public class InformixDatabase extends Database<InformixConnection> {
     protected InformixConnection doGetConnection(Connection connection) {
         return new InformixConnection(this, connection);
     }
+
+
+
+
+
 
     @Override
     public final void ensureSupported() {

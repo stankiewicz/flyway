@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -257,7 +257,21 @@ public class JdbcTemplate {
     private void extractWarnings(Results results, Statement statement) throws SQLException {
         SQLWarning warning = statement.getWarnings();
         while (warning != null) {
-            results.addWarning(new WarningImpl(warning.getErrorCode(), warning.getSQLState(), warning.getMessage()));
+            int code = warning.getErrorCode();
+            String state = warning.getSQLState();
+            String message = warning.getMessage();
+
+            if (state == null)
+            {
+                state = "";
+            }
+
+            if (message == null)
+            {
+                message = "";
+            }
+
+            results.addWarning(new WarningImpl(code, state, message));
             warning = warning.getNextWarning();
         }
     }
@@ -277,34 +291,28 @@ public class JdbcTemplate {
         // retrieve all results to ensure all errors are detected
         int updateCount = -1;
         while (hasResults || (updateCount = statement.getUpdateCount()) != -1) {
+            List<String> columns = null;
+            List<List<String>> data = null;
+            if (hasResults) {
+                try (ResultSet resultSet = statement.getResultSet()) {
+                    columns = new ArrayList<>();
+                    ResultSetMetaData metadata = resultSet.getMetaData();
+                    int columnCount = metadata.getColumnCount();
+                    for (int i = 1; i <= columnCount; i++) {
+                        columns.add(metadata.getColumnName(i));
+                    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            results.addResult(new Result(updateCount
-
-
-
-            ));
+                    data = new ArrayList<>();
+                    while (resultSet.next()) {
+                        List<String> row = new ArrayList<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            row.add(resultSet.getString(i));
+                        }
+                        data.add(row);
+                    }
+                }
+            }
+            results.addResult(new Result(updateCount, columns, data));
             hasResults = statement.getMoreResults();
         }
     }

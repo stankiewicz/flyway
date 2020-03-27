@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import java.util.concurrent.Callable;
 /**
  * Spring-like template for executing transactions.
  */
-public class TransactionTemplate implements Template {
-    private static final Log LOG = LogFactory.getLog(TransactionTemplate.class);
+public class TransactionalExecutionTemplate implements ExecutionTemplate {
+    private static final Log LOG = LogFactory.getLog(TransactionalExecutionTemplate.class);
 
     /**
-     * The connection for the transaction.
+     * The connection to the database
      */
     private final Connection connection;
 
@@ -43,19 +43,10 @@ public class TransactionTemplate implements Template {
     /**
      * Creates a new transaction template for this connection.
      *
-     * @param connection The connection for the transaction.
-     */
-    public TransactionTemplate(Connection connection) {
-        this(connection, true);
-    }
-
-    /**
-     * Creates a new transaction template for this connection.
-     *
      * @param connection          The connection for the transaction.
      * @param rollbackOnException Whether to roll back the transaction when an exception is thrown.
      */
-    public TransactionTemplate(Connection connection, boolean rollbackOnException) {
+    TransactionalExecutionTemplate(Connection connection, boolean rollbackOnException) {
         this.connection = connection;
         this.rollbackOnException = rollbackOnException;
     }
@@ -66,6 +57,7 @@ public class TransactionTemplate implements Template {
      * @param callback The callback to execute.
      * @return The result of the transaction code.
      */
+    @Override
     public <T> T execute(Callable<T> callback) {
         boolean oldAutocommit = true;
         try {

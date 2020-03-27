@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,13 +49,22 @@ public class DerbyDatabase extends Database<DerbyConnection> {
         return new DerbyConnection(this, connection);
     }
 
+
+
+
+
+
+
+
+
+
     @Override
     public final void ensureSupported() {
         ensureDatabaseIsRecentEnough("10.11.1.1");
 
-        ensureDatabaseNotOlderThanOtherwiseRecommendUpgradeToFlywayEdition("10.13", org.flywaydb.core.internal.license.Edition.PRO);
+        ensureDatabaseNotOlderThanOtherwiseRecommendUpgradeToFlywayEdition("10.13", org.flywaydb.core.internal.license.Edition.ENTERPRISE);
 
-        recommendFlywayUpgradeIfNecessary("10.14");
+        recommendFlywayUpgradeIfNecessary("10.15");
     }
 
     @Override

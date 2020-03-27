@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,7 @@
 package org.flywaydb.core.internal.database.db2;
 
 import org.flywaydb.core.api.configuration.Configuration;
-import org.flywaydb.core.internal.parser.Parser;
-import org.flywaydb.core.internal.parser.ParserContext;
-import org.flywaydb.core.internal.parser.PeekingReader;
-import org.flywaydb.core.internal.parser.Token;
-import org.flywaydb.core.internal.parser.TokenType;
+import org.flywaydb.core.internal.parser.*;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,36 +25,36 @@ public class DB2Parser extends Parser {
     private static final String COMMENT_DIRECTIVE = "--#";
     private static final String SET_TERMINATOR_DIRECTIVE = COMMENT_DIRECTIVE + "SET TERMINATOR ";
 
-    public DB2Parser(Configuration configuration) {
-        super(configuration, COMMENT_DIRECTIVE.length());
+    public DB2Parser(Configuration configuration, ParsingContext parsingContext) {
+        super(configuration, parsingContext, COMMENT_DIRECTIVE.length());
     }
 
     @Override
-    protected void adjustBlockDepth(ParserContext context, List<Token> tokens, Token keyword) {
+    protected void adjustBlockDepth(ParserContext context, List<Token> tokens, Token keyword, PeekingReader reader) throws IOException {
         boolean previousTokenIsKeyword = !tokens.isEmpty() && tokens.get(tokens.size() - 1).getType() == TokenType.KEYWORD;
 
         int lastKeywordIndex = getLastKeywordIndex(tokens);
-        Token previousKeyword = lastKeywordIndex >= 0 ? tokens.get(lastKeywordIndex) : null;
+        String previousKeyword = lastKeywordIndex >= 0 ? tokens.get(lastKeywordIndex).getText() : null;
 
         lastKeywordIndex = getLastKeywordIndex(tokens, lastKeywordIndex);
-        Token previousPreviousToken = lastKeywordIndex >= 0 ? tokens.get(lastKeywordIndex) : null;
+        String previousPreviousToken = lastKeywordIndex >= 0 ? tokens.get(lastKeywordIndex).getText() : null;
 
         if (
             // BEGIN increases block depth, exception when used with ROW BEGIN
                 ("BEGIN".equals(keyword.getText())
-                        && (!"ROW".equals(previousKeyword.getText())
-                        || previousPreviousToken == null || "EACH".equals(previousPreviousToken.getText())))
+                        && (!"ROW".equals(previousKeyword)
+                        || previousPreviousToken == null || "EACH".equals(previousPreviousToken)))
                         // CASE, DO, IF and REPEAT increase block depth
                         || (("CASE".equals(keyword.getText()) || "DO".equals(keyword.getText())
                         || "IF".equals(keyword.getText()) || "REPEAT".equals(keyword.getText())))) {
             // But not END IF and END WHILE
-            if (!previousTokenIsKeyword || !"END".equals(previousKeyword.getText())) {
+            if (!previousTokenIsKeyword || !"END".equals(previousKeyword)) {
                 context.increaseBlockDepth();
 
             }
         } else if (
             // END decreases block depth, exception when used with ROW END
-                "END".equals(keyword.getText()) && !"ROW".equals(previousKeyword.getText())) {
+                "END".equals(keyword.getText()) && !"ROW".equals(previousKeyword)) {
             context.decreaseBlockDepth();
         }
     }

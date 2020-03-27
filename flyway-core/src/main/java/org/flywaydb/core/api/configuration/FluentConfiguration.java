@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,14 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.callback.Callback;
 import org.flywaydb.core.api.migration.JavaMigration;
 import org.flywaydb.core.api.resolver.MigrationResolver;
+import org.flywaydb.core.internal.configuration.ConfigUtils;
+import org.flywaydb.core.internal.util.ClassUtils;
 
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -85,9 +88,10 @@ public class FluentConfiguration implements Configuration {
     }
 
     @Override
-    public String[] getSchemas() {
-        return config.getSchemas();
-    }
+    public String getDefaultSchema() { return config.getDefaultSchema(); }
+
+    @Override
+    public String[] getSchemas() { return config.getSchemas(); }
 
     @Override
     public String getTable() {
@@ -168,6 +172,9 @@ public class FluentConfiguration implements Configuration {
     public boolean isIgnoreFutureMigrations() {
         return config.isIgnoreFutureMigrations();
     }
+
+    @Override
+    public boolean isValidateMigrationNaming() { return config.isValidateMigrationNaming(); }
 
     @Override
     public boolean isValidateOnMigrate() {
@@ -284,6 +291,11 @@ public class FluentConfiguration implements Configuration {
         return config.getLicenseKey();
     }
 
+    @Override
+    public boolean outputQueryResults() {
+        return config.outputQueryResults();
+    }
+
     /**
      * Sets the stream where to output the SQL statements of a migration dry run. {@code null} to execute the SQL statements
      * directly against the database. The stream when be closing when Flyway finishes writing the output.
@@ -383,7 +395,7 @@ public class FluentConfiguration implements Configuration {
      * <p>Note that this is only applicable for PostgreSQL, Aurora PostgreSQL, SQL Server and SQLite which all have
      * statements that do not run at all within a transaction.</p>
      * <p>This is not to be confused with implicit transaction, as they occur in MySQL or Oracle, where even though a
-     * DDL statement was run within within a transaction, the database will issue an implicit commit before and after
+     * DDL statement was run within a transaction, the database will issue an implicit commit before and after
      * its execution.</p>
      *
      * @param mixed {@code true} if mixed migrations should be allowed. {@code false} if an error should be thrown instead. (default: {@code false})
@@ -460,6 +472,18 @@ public class FluentConfiguration implements Configuration {
     }
 
     /**
+     * Whether to validate migrations and callbacks whose scripts do not obey the correct naming convention. A failure can be
+     * useful to check that errors such as case sensitivity in migration prefixes have been corrected.
+     *
+     * @param validateMigrationNaming {@code false} to continue normally, {@code true} to fail
+     *                                                fast with an exception. (default: {@code false})
+     */
+    public FluentConfiguration validateMigrationNaming(boolean validateMigrationNaming){
+        config.setValidateMigrationNaming(validateMigrationNaming);
+        return this;
+    }
+
+    /**
      * Whether to automatically call validate or not when running migrate.
      *
      * @param validateOnMigrate {@code true} if validate should be called. {@code false} if not. (default: {@code true})
@@ -488,7 +512,7 @@ public class FluentConfiguration implements Configuration {
      * Whether to disable clean.
      * <p>This is especially useful for production environments where running clean can be quite a career limiting move.</p>
      *
-     * @param cleanDisabled {@code true} to disabled clean. {@code false} to leave it enabled.  (default: {@code false})
+     * @param cleanDisabled {@code true} to disable clean. {@code false} to leave it enabled.  (default: {@code false})
      */
     public FluentConfiguration cleanDisabled(boolean cleanDisabled) {
         config.setCleanDisabled(cleanDisabled);
@@ -546,14 +570,31 @@ public class FluentConfiguration implements Configuration {
     }
 
     /**
-     * Sets the schemas managed by Flyway. These schema names are case-sensitive. (default: The default schema for the database connection)
+     * Sets the default schema managed by Flyway. This schema name is case-sensitive. If not specified, but
+     * <i>schemas</i> is, Flyway uses the first schema in that list. If that is also not specified, Flyway uses the default
+     * schema for the database connection.
      * <p>Consequences:</p>
      * <ul>
-     * <li>Flyway will automatically attempt to create all these schemas, unless the first one already exists.</li>
-     * <li>The first schema in the list will be automatically set as the default one during the migration.</li>
-     * <li>The first schema in the list will also be the one containing the schema history table.</li>
+     * <li>This schema will be the one containing the schema history table.</li>
+     * <li>This schema will be the default for the database connection (provided the database supports this concept).</li>
+     * </ul>
+     *
+     * @param schema The default schema managed by Flyway.
+     */
+    public FluentConfiguration defaultSchema(String schema) {
+        config.setDefaultSchema(schema);
+        return this;
+    }
+
+    /**
+     * Sets the schemas managed by Flyway. These schema names are case-sensitive. If not specified, Flyway uses
+     * the default schema for the database connection. If <i>defaultSchemaName</i> is not specified, then the first of
+     * this list also acts as default schema.
+     * <p>Consequences:</p>
+     * <ul>
+     * <li>Flyway will automatically attempt to create all these schemas, unless they already exist.</li>
      * <li>The schemas will be cleaned in the order of this list.</li>
-     * <li>If Flyway created them, the schemas themselves will as be dropped when cleaning.</li>
+     * <li>If Flyway created them, the schemas themselves will be dropped when cleaning.</li>
      * </ul>
      *
      * @param schemas The schemas managed by Flyway. May not be {@code null}. Must contain at least one element.
@@ -578,10 +619,11 @@ public class FluentConfiguration implements Configuration {
 
     /**
      * <p>Sets the tablespace where to create the schema history table that will be used by Flyway.</p>
-     * <p>This setting is only relevant for databases that do support the notion of tablespaces. It's value is simply
+     * <p>If not specified, Flyway uses the default tablespace for the database connection.
+     * This setting is only relevant for databases that do support the notion of tablespaces. Its value is simply
      * ignored for all others.</p>
      *
-     * @param tablespace The tablespace where to create the schema history table that will be used by Flyway. (default: The default tablespace for the database connection)
+     * @param tablespace The tablespace where to create the schema history table that will be used by Flyway. 
      */
     public FluentConfiguration tablespace(String tablespace) {
         config.setTablespace(tablespace);
@@ -589,10 +631,14 @@ public class FluentConfiguration implements Configuration {
     }
 
     /**
-     * Sets the target version up to which Flyway should consider migrations. Migrations with a higher version number will
-     * be ignored.
-     *
-     * @param target The target version up to which Flyway should consider migrations. (default: the latest version)
+     * Sets the target version up to which Flyway should consider migrations.
+     * Migrations with a higher version number will be ignored. 
+     * Special values:
+     * <ul>
+     * <li>{@code current}: designates the current version of the schema</li>
+     * <li>{@code latest}: the latest version of the schema, as defined by the migration with the highest version</li>
+     * </ul>
+     * Defaults to {@code latest}.
      */
     public FluentConfiguration target(MigrationVersion target) {
         config.setTarget(target);
@@ -601,11 +647,13 @@ public class FluentConfiguration implements Configuration {
 
     /**
      * Sets the target version up to which Flyway should consider migrations.
-     * Migrations with a higher version number will be ignored.
-     *
-     * @param target The target version up to which Flyway should consider migrations.
-     *               The special value {@code current} designates the current version of the schema. (default: the latest
-     *               version)
+     * Migrations with a higher version number will be ignored. 
+     * Special values:
+     * <ul>
+     * <li>{@code current}: designates the current version of the schema</li>
+     * <li>{@code latest}: the latest version of the schema, as defined by the migration with the highest version</li>
+     * </ul>
+     * Defaults to {@code latest}.
      */
     public FluentConfiguration target(String target) {
         config.setTargetAsString(target);
@@ -1004,6 +1052,39 @@ public class FluentConfiguration implements Configuration {
      */
     public FluentConfiguration configuration(Map<String, String> props) {
         config.configure(props);
+        return this;
+    }
+
+    /**
+     * Load configuration files from the default locations:
+     * $installationDir$/conf/flyway.conf
+     * $user.home$/flyway.conf
+     * $workingDirectory$/flyway.conf
+     *
+     * The configuration files must be encoded with UTF-8.
+     *
+     * @throws FlywayException when the configuration failed.
+     */
+    public FluentConfiguration loadDefaultConfigurationFiles() {
+        return loadDefaultConfigurationFiles("UTF-8");
+    }
+
+    /**
+     * Load configuration files from the default locations:
+     * $installationDir$/conf/flyway.conf
+     * $user.home$/flyway.conf
+     * $workingDirectory$/flyway.conf
+     *
+     * @param encoding the conf file encoding.
+     * @throws FlywayException when the configuration failed.
+     */
+    public FluentConfiguration loadDefaultConfigurationFiles(String encoding) {
+        String installationPath = ClassUtils.getLocationOnDisk(FluentConfiguration.class);
+        File installationDir = new File(installationPath).getParentFile();
+
+        Map<String, String> configMap = ConfigUtils.loadDefaultConfigurationFiles(installationDir, encoding);
+
+        config.configure(configMap);
         return this;
     }
 

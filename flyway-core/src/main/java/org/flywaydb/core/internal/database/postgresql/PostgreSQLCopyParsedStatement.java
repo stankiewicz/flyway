@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,11 +89,7 @@ public class PostgreSQLCopyParsedStatement extends ParsedSqlStatement {
         try {
             try {
                 Long updateCount = (Long) copyManagerCopyInMethod.invoke(copyManager, getSql(), new StringReader(copyData));
-                results.addResult(new Result(updateCount
-
-
-
-                ));
+                results.addResult(new Result(updateCount, null, null));
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new SQLException("Unable to execute COPY operation", e);
             }

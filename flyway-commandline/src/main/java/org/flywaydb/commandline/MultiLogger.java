@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,56 +13,66 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.flywaydb.core.internal.logging.console;
+package org.flywaydb.commandline;
 
 import org.flywaydb.core.api.logging.Log;
 
-/**
- * Wrapper around a simple Console output.
- */
-public class ConsoleLog implements Log {
- 	public enum Level {
- 		DEBUG, INFO, WARN
- 	}
-	
-    private final Level level;
+import java.util.List;
 
-    /**
-     * Creates a new Console Log.
-     *
-     * @param level the log level.
-     */
-    public ConsoleLog(Level level) {
-        this.level = level;
+/**
+ * Log implementation that forwards method calls to multiple implementations
+ */
+class MultiLogger implements Log {
+
+    private final List<Log> logs;
+
+    public MultiLogger(List<Log> logs) {
+        this.logs = logs;
     }
 
     @Override
     public boolean isDebugEnabled() {
-        return level == Level.DEBUG;
+        for (Log log : logs) {
+            if (!log.isDebugEnabled()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
+    @Override
     public void debug(String message) {
-        if (isDebugEnabled()) {
-            System.out.println("DEBUG: " + message);
+        for (Log log : logs) {
+            log.debug(message);
         }
     }
 
+    @Override
     public void info(String message) {
-    	if (level.compareTo(Level.INFO) <= 0) {
-	        System.out.println(message);
-	    }
+        for (Log log : logs) {
+            log.info(message);
+        }
     }
 
+    @Override
     public void warn(String message) {
-    	System.out.println("WARNING: " + message);
+        for (Log log : logs) {
+            log.warn(message);
+        }
     }
 
+    @Override
     public void error(String message) {
-        System.err.println("ERROR: " + message);
+        for (Log log : logs) {
+            log.error(message);
+        }
     }
 
+    @Override
     public void error(String message, Exception e) {
-        System.err.println("ERROR: " + message);
-        e.printStackTrace(System.err);
+        for (Log log : logs) {
+            log.error(message, e);
+        }
     }
 }

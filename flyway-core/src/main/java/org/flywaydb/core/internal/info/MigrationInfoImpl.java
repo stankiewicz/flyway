@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.resolver.ResolvedMigration;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationImpl;
 import org.flywaydb.core.internal.schemahistory.AppliedMigration;
+import org.flywaydb.core.internal.schemahistory.SchemaHistory;
 import org.flywaydb.core.internal.util.AbbreviationUtils;
 
 import java.util.Date;
-import java.util.Objects;
 
 /**
  * Default implementation of MigrationInfo.
@@ -194,7 +194,7 @@ public class MigrationInfoImpl implements MigrationInfo {
 
         if (appliedMigration.getVersion() == null) {
             if (appliedMigration.getInstalledRank() == context.latestRepeatableRuns.get(appliedMigration.getDescription())) {
-                if (Objects.equals(appliedMigration.getChecksum(), resolvedMigration.getChecksum())) {
+                if (resolvedMigration.checksumMatches(appliedMigration.getChecksum())) {
                     return MigrationState.SUCCESS;
                 }
                 return MigrationState.OUTDATED;
@@ -238,6 +238,14 @@ public class MigrationInfoImpl implements MigrationInfo {
             return appliedMigration.getExecutionTime();
         }
         return null;
+    }
+
+    @Override
+    public String getPhysicalLocation() {
+        if (resolvedMigration != null) {
+            return resolvedMigration.getPhysicalLocation();
+        }
+        return "";
     }
 
     /**
@@ -306,13 +314,12 @@ public class MigrationInfoImpl implements MigrationInfo {
                 }
                 if (resolvedMigration.getVersion() != null
                         || (context.pending && MigrationState.OUTDATED != state && MigrationState.SUPERSEDED != state)) {
-                    if (!Objects.equals(resolvedMigration.getChecksum(), appliedMigration.getChecksum())) {
+                    if (!resolvedMigration.checksumMatches(appliedMigration.getChecksum())) {
                         return createMismatchMessage("checksum", migrationIdentifier,
                                 appliedMigration.getChecksum(), resolvedMigration.getChecksum());
                     }
                 }
-                if (!AbbreviationUtils.abbreviateDescription(resolvedMigration.getDescription())
-                        .equals(appliedMigration.getDescription())) {
+                if (descriptionMismatch(resolvedMigration, appliedMigration)) {
                     return createMismatchMessage("description", migrationIdentifier,
                             appliedMigration.getDescription(), resolvedMigration.getDescription());
                 }
@@ -327,6 +334,16 @@ public class MigrationInfoImpl implements MigrationInfo {
         }
 
         return null;
+    }
+
+    private boolean descriptionMismatch(ResolvedMigration resolvedMigration, AppliedMigration appliedMigration) {
+        // For some databases, we can't put an empty description into the history table
+        if (SchemaHistory.NO_DESCRIPTION_MARKER.equals(appliedMigration.getDescription())) {
+            return !"".equals(resolvedMigration.getDescription());
+        }
+        // The default
+        return (!AbbreviationUtils.abbreviateDescription(resolvedMigration.getDescription())
+                .equals(appliedMigration.getDescription()));
     }
 
     /**
@@ -356,31 +373,31 @@ public class MigrationInfoImpl implements MigrationInfo {
 
         // Below baseline migrations come before applied ones
         if (state == MigrationState.BELOW_BASELINE && oState.isApplied()) {
-            return Integer.MIN_VALUE;
+            return -1;
         }
         if (state.isApplied() && oState == MigrationState.BELOW_BASELINE) {
-            return Integer.MAX_VALUE;
+            return 1;
         }
 
         if (state == MigrationState.IGNORED && oState.isApplied()) {
             if (getVersion() != null && o.getVersion() != null) {
                 return getVersion().compareTo(o.getVersion());
             }
-            return Integer.MIN_VALUE;
+            return -1;
         }
         if (state.isApplied() && oState == MigrationState.IGNORED) {
             if (getVersion() != null && o.getVersion() != null) {
                 return getVersion().compareTo(o.getVersion());
             }
-            return Integer.MAX_VALUE;
+            return 1;
         }
 
         // Sort installed before pending
         if (getInstalledRank() != null) {
-            return Integer.MIN_VALUE;
+            return -1;
         }
         if (o.getInstalledRank() != null) {
-            return Integer.MAX_VALUE;
+            return 1;
         }
 
         // No migration installed, sort according to other criteria
@@ -406,10 +423,10 @@ public class MigrationInfoImpl implements MigrationInfo {
 
         // One versioned and one repeatable migration: versioned migration goes before repeatable one
         if (getVersion() != null) {
-            return Integer.MIN_VALUE;
+            return -1;
         }
         if (o.getVersion() != null) {
-            return Integer.MAX_VALUE;
+            return 1;
         }
 
         // Two repeatable migrations: sort by description

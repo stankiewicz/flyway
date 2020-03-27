@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,8 @@ import org.flywaydb.core.internal.database.base.Database;
 import org.flywaydb.core.internal.database.base.Table;
 import org.flywaydb.core.internal.exception.FlywaySqlException;
 import org.flywaydb.core.internal.jdbc.JdbcTemplate;
-import org.flywaydb.core.internal.jdbc.NonTransactionTemplate;
 import org.flywaydb.core.internal.jdbc.RowMapper;
-import org.flywaydb.core.internal.jdbc.Template;
-import org.flywaydb.core.internal.jdbc.TransactionTemplate;
+import org.flywaydb.core.internal.jdbc.ExecutionTemplateFactory;
 import org.flywaydb.core.internal.sqlscript.SqlScriptExecutorFactory;
 import org.flywaydb.core.internal.sqlscript.SqlScriptFactory;
 
@@ -76,32 +74,10 @@ class JdbcTableSchemaHistory extends SchemaHistory {
                            Database database, Table table) {
         this.sqlScriptExecutorFactory = sqlScriptExecutorFactory;
         this.sqlScriptFactory = sqlScriptFactory;
-        this.table = determineTable(table);
+        this.table = table;
         this.database = database;
         this.connection = database.getMainConnection();
         this.jdbcTemplate = connection.getJdbcTemplate();
-    }
-
-    /**
-     * Checks whether Flyway has to fallback to the old default table.
-     *
-     * @param table The currently configured table.
-     * @return The table to use.
-     */
-    private Table determineTable(Table table) {
-        // Ensure we are using the default table name before checking for the fallback table
-        if (table.getName().equals("flyway_schema_history") && !table.exists()) {
-            Table fallbackTable = table.getSchema().getTable("schema_version");
-            if (fallbackTable.exists()) {
-                LOG.warn("Could not find schema history table " + table + ", but found " + fallbackTable + " instead." +
-                        " You are seeing this message because Flyway changed its default for flyway.table in" +
-                        " version 5.0.0 to flyway_schema_history and you are still relying on the old default (schema_version)." +
-                        " Set flyway.table=schema_version in your configuration to fix this." +
-                        " This fallback mechanism will be removed in Flyway 6.0.0.");
-                table = fallbackTable;
-            }
-        }
-        return table;
     }
 
     @Override
@@ -127,10 +103,8 @@ class JdbcTableSchemaHistory extends SchemaHistory {
                         LOG.info("Creating Schema History table " + table + (baseline ? " with baseline" : "") + " ...");
                     }
                     try {
-                        Template template = database.supportsDdlTransactions()?
-                            new TransactionTemplate(connection.getJdbcConnection(), true):
-                            new NonTransactionTemplate(connection.getJdbcConnection());
-                        template.execute(new Callable<Object>() {
+                        ExecutionTemplateFactory.createExecutionTemplate(connection.getJdbcConnection(),
+                                database).execute(new Callable<Object>() {
                             @Override
                             public Object call() {
                                 sqlScriptExecutorFactory.createSqlScriptExecutor(connection.getJdbcConnection()
@@ -182,6 +156,10 @@ class JdbcTableSchemaHistory extends SchemaHistory {
         try {
             String versionStr = version == null ? null : version.toString();
 
+            if (!database.supportsEmptyMigrationDescription() && "".equals(description)) {
+                description = NO_DESCRIPTION_MARKER;
+            }
+
             jdbcTemplate.update(database.getInsertStatement(table),
                     installedRank, versionStr, description, type.name(), script, checksum, database.getInstalledBy(),
                     executionTime, success);
@@ -215,11 +193,20 @@ class JdbcTableSchemaHistory extends SchemaHistory {
                         checksum = null;
                     }
 
+                    // Convert legacy types to their modern equivalent to avoid validation errors
+                    String type = rs.getString("type");
+                    if ("SPRING_JDBC".equals(type)) {
+                        type = "JDBC";
+                    }
+                    if ("UNDO_SPRING_JDBC".equals(type)) {
+                        type = "UNDO_JDBC";
+                    }
+
                     return new AppliedMigration(
                             rs.getInt("installed_rank"),
                             rs.getString("version") != null ? MigrationVersion.fromVersion(rs.getString("version")) : null,
                             rs.getString("description"),
-                            MigrationType.valueOf(rs.getString("type")),
+                            MigrationType.valueOf(type),
                             rs.getString("script"),
                             checksum,
                             rs.getTimestamp("installed_on"),
@@ -281,13 +268,25 @@ class JdbcTableSchemaHistory extends SchemaHistory {
                 + " (Description: " + description + ", Type: " + type + ", Checksum: " + checksum + ")  ...");
 
         try {
-            jdbcTemplate.update("UPDATE " + table
-                            + " SET "
-                            + database.quote("description") + "=? , "
-                            + database.quote("type") + "=? , "
-                            + database.quote("checksum") + "=?"
-                            + " WHERE " + database.quote("version") + "=?",
-                    description, type, checksum, version);
+            if (resolvedMigration.getVersion() != null) {
+                jdbcTemplate.update("UPDATE " + table
+                                + " SET "
+                                + database.quote("description") + "=? , "
+                                + database.quote("type") + "=? , "
+                                + database.quote("checksum") + "=?"
+                                + " WHERE " + database.quote("version") + "=?",
+                        description, type, checksum, version);
+            }
+            else {
+                jdbcTemplate.update("UPDATE " + table
+                                + " SET "
+                                + database.quote("description") + "=? , "
+                                + database.quote("type") + "=? , "
+                                + database.quote("checksum") + "=?"
+                                + " WHERE " + database.quote("checksum") + "=" + appliedMigration.getChecksum(),
+                        description, type, checksum);
+            }
+
         } catch (SQLException e) {
             throw new FlywaySqlException("Unable to repair Schema History table " + table
                     + " for version " + version, e);

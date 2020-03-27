@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.flywaydb.core.api.logging.Log;
 import org.flywaydb.core.api.logging.LogFactory;
 import org.flywaydb.core.internal.resource.LoadableResource;
 import org.flywaydb.core.internal.resource.classpath.ClassPathResource;
+import org.flywaydb.core.internal.scanner.ResourceNameCache;
 import org.flywaydb.core.internal.scanner.classpath.jboss.JBossVFSv2UrlResolver;
 import org.flywaydb.core.internal.scanner.classpath.jboss.JBossVFSv3ClassPathLocationScanner;
 import org.flywaydb.core.internal.util.ClassUtils;
@@ -39,9 +40,10 @@ import java.util.regex.Pattern;
 /**
  * ClassPath scanner.
  */
-public class ClassPathScanner implements ResourceAndClassScanner {
+public class ClassPathScanner<I> implements ResourceAndClassScanner<I> {
     private static final Log LOG = LogFactory.getLog(ClassPathScanner.class);
 
+    private final Class<I> implementedInterface;
     /**
      * The ClassLoader for loading migrations on the classpath.
      */
@@ -63,16 +65,19 @@ public class ClassPathScanner implements ResourceAndClassScanner {
     /**
      * Cache resource names.
      */
-    private final Map<ClassPathLocationScanner, Map<URL, Set<String>>> resourceNameCache = new HashMap<>();
+    private final ResourceNameCache resourceNameCache;
 
     /**
      * Creates a new Classpath scanner.
      *
      * @param classLoader The ClassLoader for loading migrations on the classpath.
      */
-    public ClassPathScanner(ClassLoader classLoader, Charset encoding, Location location) {
+    public ClassPathScanner(Class<I> implementedInterface, ClassLoader classLoader, Charset encoding, Location location,
+                            ResourceNameCache resourceNameCache) {
+        this.implementedInterface = implementedInterface;
         this.classLoader = classLoader;
         this.location = location;
+        this.resourceNameCache = resourceNameCache;
 
         LOG.debug("Scanning for classpath resources at '" + location + "' ...");
         for (String resourceName : findResourceNames()) {
@@ -87,14 +92,17 @@ public class ClassPathScanner implements ResourceAndClassScanner {
     }
 
     @Override
-    public Collection<Class<?>> scanForClasses() {
+    public Collection<Class<? extends I>> scanForClasses() {
         LOG.debug("Scanning for classes at " + location);
 
-        List<Class<?>> classes = new ArrayList<>();
+        List<Class<? extends I>> classes = new ArrayList<>();
 
         for (LoadableResource resource : resources) {
             if (resource.getAbsolutePath().endsWith(".class")) {
-                Class<?> clazz = ClassUtils.loadClass(toClassName(resource.getAbsolutePath()), classLoader);
+                Class<? extends I> clazz = ClassUtils.loadClass(
+                        implementedInterface,
+                        toClassName(resource.getAbsolutePath()),
+                        classLoader);
                 if (clazz != null) {
                     classes.add(clazz);
                 }
@@ -137,10 +145,10 @@ public class ClassPathScanner implements ResourceAndClassScanner {
                 String scanRoot = UrlUtils.toFilePath(resolvedUrl);
                 LOG.warn("Unable to scan location: " + scanRoot + " (unsupported protocol: " + protocol + ")");
             } else {
-                Set<String> names = resourceNameCache.get(classPathLocationScanner).get(resolvedUrl);
+                Set<String> names = resourceNameCache.get(classPathLocationScanner, resolvedUrl);
                 if (names == null) {
                     names = classPathLocationScanner.findResourceNames(location.getPath(), resolvedUrl);
-                    resourceNameCache.get(classPathLocationScanner).put(resolvedUrl, names);
+                    resourceNameCache.put(classPathLocationScanner, resolvedUrl, names);
                 }
                 resourceNames.addAll(names);
             }
@@ -197,7 +205,7 @@ public class ClassPathScanner implements ResourceAndClassScanner {
         }
 
         if (!locationResolved) {
-            LOG.warn("Unable to resolve location " + location);
+            LOG.warn("Unable to resolve location " + location + ". Note this warning will become an error in Flyway 7.");
         }
 
         return resourceNames;
@@ -225,7 +233,7 @@ public class ClassPathScanner implements ResourceAndClassScanner {
                 urls = classLoader.getResources(location.getPath() + "/flyway.location");
                 if (!urls.hasMoreElements()) {
                     LOG.warn("Unable to resolve location " + location + " (ClassLoader: " + classLoader + ")"
-                            + " On WebSphere an empty file named flyway.location must be present on the classpath location for WebSphere to find it!");
+                            + " On WebSphere an empty file named flyway.location must be present on the classpath location for WebSphere to find it!\nNote this warning will become an error in Flyway 7.");
                 }
                 while (urls.hasMoreElements()) {
                     URL url = urls.nextElement();
@@ -233,7 +241,7 @@ public class ClassPathScanner implements ResourceAndClassScanner {
                 }
             } catch (IOException e) {
                 LOG.warn("Unable to resolve location " + location + " (ClassLoader: " + classLoader + ")"
-                        + " On WebSphere an empty file named flyway.location must be present on the classpath location for WebSphere to find it!");
+                        + " On WebSphere an empty file named flyway.location must be present on the classpath location for WebSphere to find it!\nNote this warning will become an error in Flyway 7.");
             }
         } else {
             Enumeration<URL> urls;
@@ -243,7 +251,7 @@ public class ClassPathScanner implements ResourceAndClassScanner {
                     locationUrls.add(urls.nextElement());
                 }
             } catch (IOException e) {
-                LOG.warn("Unable to resolve location " + location + " (ClassLoader: " + classLoader + "): " + e.getMessage());
+                LOG.warn("Unable to resolve location " + location + " (ClassLoader: " + classLoader + "): " + e.getMessage() + "\nNote this warning will become an error in Flyway 7.");
             }
         }
 

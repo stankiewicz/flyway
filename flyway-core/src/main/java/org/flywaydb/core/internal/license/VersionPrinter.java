@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,10 @@ public class VersionPrinter {
         // Do nothing.
     }
 
+    public static String getVersion() {
+        return version;
+    }
+
     /**
      * Prints the Flyway version.
      */
@@ -85,7 +89,7 @@ public class VersionPrinter {
     }
 
     public static void printVersionOnly() {
-        LOG.info(EDITION + " " + version + " by Boxfuse");
+        LOG.info(EDITION + " " + version + " by Redgate");
     }
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Boxfuse GmbH
+ * Copyright 2010-2020 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.flywaydb.core.internal.jdbc;
+
+import java.util.concurrent.Callable;
+
 /**
- * Private API. No compatibility guarantees provided.
+ * Spring-like template for executing operations in the context of a database connection.
  */
-package org.flywaydb.core.internal.logging.console;
+public interface ExecutionTemplate {
+
+    /**
+     * Executes this callback within the context of the connection
+     *
+     * @param callback The callback to execute.
+     * @return The result of the callback.
+     */
+    <T> T execute(Callable<T> callback);
+}
