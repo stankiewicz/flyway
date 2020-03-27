@@ -38,15 +38,13 @@ public class CloudSpannerTable extends Table<CloudSpannerDatabase, CloudSpannerS
 
     @Override
     protected void doLock() throws SQLException {
-        // will lock somewhere else as there is no release lock
     }
 
     @Override
     protected void doDrop() throws SQLException {
-        // final Statement statement = jdbcTemplate.getConnection().createStatement();
-        // // maybe drop interleaved tables and indexes first?
-        // statement.addBatch("DROP TABLE " + database.quote(name));
-        // statement.executeBatch();
+        try(Statement statement = jdbcTemplate.getConnection().createStatement()){
+            statement.execute("DROP TABLE " + database.quote(name));
+        }
     }
 
     @Override
