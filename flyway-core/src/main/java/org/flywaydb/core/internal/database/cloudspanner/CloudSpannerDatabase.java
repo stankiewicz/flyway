@@ -58,6 +58,11 @@ public class CloudSpannerDatabase extends Database<CloudSpannerConnection> {
     }
 
     @Override
+    public boolean useSingleConnection() {
+        return false;
+    }
+
+    @Override
     public String getRawCreateScript(Table table, boolean baseline) {
         return "" +
                 "CREATE TABLE " + table.getName() + " (\n" +

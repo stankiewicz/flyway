@@ -28,7 +28,7 @@ public class CloudSpannerTable extends Table<CloudSpannerDatabase, CloudSpannerS
     protected boolean doExists() throws SQLException {
         try (Connection c = database.getNewRawConnection()){
             Statement s = c.createStatement();
-            s.execute("SET TRANSACTION READ ONLY");
+            s.execute("SET READONLY = true");
             s.close();
             try(ResultSet tables = c.getMetaData().getTables("", "", this.name, null)){
                 return tables.next();

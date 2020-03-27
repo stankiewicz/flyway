@@ -34,7 +34,7 @@ public class CloudSpannerSchema extends Schema<CloudSpannerDatabase, CloudSpanne
 
         try (Connection c = database.getNewRawConnection()){
             Statement s = c.createStatement();
-            s.execute("SET TRANSACTION READ ONLY");
+            s.execute("SET READONLY = true");
             s.close();
             try(ResultSet tables = c.getMetaData().getTables("", "", null, null)){
                 return !tables.next();
@@ -63,7 +63,7 @@ public class CloudSpannerSchema extends Schema<CloudSpannerDatabase, CloudSpanne
         List<CloudSpannerTable> tablesList = new ArrayList<>();
         try (Connection c = database.getNewRawConnection()) {
             Statement s = c.createStatement();
-            s.execute("SET TRANSACTION READ ONLY");
+            s.execute("SET READONLY = true");
             s.close();
             ResultSet tablesRs = c.getMetaData().getTables("", "", null, null);
             while (tablesRs.next()) {
