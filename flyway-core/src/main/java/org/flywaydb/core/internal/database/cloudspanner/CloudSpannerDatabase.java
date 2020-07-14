@@ -94,7 +94,7 @@ public class CloudSpannerDatabase extends Database<CloudSpannerConnection> {
                 "    success BOOL NOT NULL\n" +
                 ") PRIMARY KEY (installed_rank DESC);\n" +
                 (baseline ? getBaselineStatement(table) + ";\n" : "") +
-                "CREATE INDEX " + table.getName() + "_s_idx ON " + table.getName() + " (\"success\");" +
+                "CREATE INDEX " + table.getName() + "_s_idx ON " + table.getName() + " (success);" +
                 "RUN BATCH;";
     }
 }
